@@ -10,3 +10,8 @@ __pycache__/
 # IDE & Editor files
 .vscode/
 .idea/
+
+# Personal data: recruiter contacts and per-run output. Never commit these.
+contacts.xlsx
+send_log.csv
+report.html
