@@ -33,6 +33,8 @@ import re
 import random
 import argparse
 
+from html import escape
+
 from datetime import datetime, date
 
 from email.mime.text import MIMEText
@@ -79,9 +81,16 @@ SUBJECT_TEMPLATES = [
 #
 # Every claim below is on the resume, with the number that backs it. Nothing is
 # padded: a recruiter who forwards this to an engineer should find the same
-# facts in the PDF and on the portfolio. `proof_url` is the one link most worth
-# opening for that kind of role, so the email points at a live thing rather
-# than asking them to go hunting.
+# facts in the PDF and on the portfolio.
+#
+# The email is built from these pieces rather than from one long paragraph, so
+# a recruiter skimming it sees a one line intro, three short bullets that each
+# lead with a name and a number, and a single link worth opening. `focus`
+# finishes the sentence "I build ...". `highlights` are (label, text) pairs,
+# most relevant first. `proof_url` is the one link most worth opening for that
+# kind of role, so the email points at a live thing rather than asking them to
+# go hunting. `show_cp` adds the competitive programming bullet, which only
+# helps for roles that screen on algorithms.
 ROLE_CATEGORIES = [
     {
         "name": "ai_ml",
@@ -94,33 +103,35 @@ ROLE_CATEGORIES = [
             "natural language", "artificial intelligence",
             "llm", "genai", "generative", "rag", "applied ai",
         ],
-        "skills": (
-            "RAG pipelines, sentence-transformers embeddings,"
-            " vector search with pgvector and HNSW indexes,"
-            " LLM inference with Llama 3.3 on Groq,"
-            " OCR with Tesseract and PyMuPDF,"
-            " computer vision with OpenCV and dlib,"
-            " and constraint optimization with Google OR-Tools"
-        ),
-        "experience_highlight": (
-            "At ZeTheta Algorithms I built the Video KYC"
-            " verification pipeline: SSD ResNet-10 locates the"
-            " face in each frame, dlib turns it into a 128"
-            " dimensional embedding compared to the ID photo,"
-            " and a passive anti spoof CNN rejects printed"
-            " photos and screen replays. Tuning the threshold on"
-            " labelled ID and selfie pairs and fusing results"
-            " across frames took it to 93 percent face"
-            " verification accuracy."
-        ),
-        "project_highlight": (
-            "I also built DocMinds, a multi tenant RAG platform"
-            " that ingests 19 file types, runs OCR on scanned"
-            " pages, embeds each chunk into a 384 dimensional"
-            " vector stored in PostgreSQL behind a pgvector HNSW"
-            " index, and answers only from retrieved context"
-            " with a citation to the exact page it used."
-        ),
+        "focus": "applied AI systems, from retrieval pipelines to computer vision",
+        "highlights": [
+            (
+                "ZeTheta Algorithms",
+                "built the Video KYC face verification pipeline (SSD"
+                " ResNet-10 detection, dlib 128 dimensional embeddings"
+                " and a passive anti spoof CNN) and tuned it to 93"
+                " percent verification accuracy.",
+            ),
+            (
+                "DocMinds",
+                "a multi tenant RAG platform that ingests 19 file types,"
+                " runs OCR on scanned pages, searches 384 dimensional"
+                " embeddings through a pgvector HNSW index, and cites"
+                " the exact page behind every answer.",
+            ),
+            (
+                "RouteOS",
+                "a vehicle routing optimizer in Google OR-Tools that cut"
+                " fleet travel distance by 20 to 35 percent against a"
+                " greedy baseline.",
+            ),
+        ],
+        "skills": [
+            "Python", "RAG", "sentence-transformers", "pgvector",
+            "Llama 3.3 on Groq", "Tesseract OCR", "OpenCV", "dlib",
+            "OR-Tools",
+        ],
+        "show_cp": True,
         "proof_url": "https://github.com/dhanoliya-ji/DocMinds",
         "proof_label": "DocMinds source",
     },
@@ -131,29 +142,27 @@ ROLE_CATEGORIES = [
             "etl", "analytics", "data processing", "big data",
             "database", "warehouse",
         ],
-        "skills": (
-            "PostgreSQL, PostGIS, pgvector, Redis,"
-            " indexing and query optimization with GiST and HNSW,"
-            " Celery background workers, async I/O,"
-            " and document ingestion across 19 file formats"
-        ),
-        "experience_highlight": (
-            "At ZeTheta Algorithms I built the data layer behind"
-            " an automated eKYC platform, including"
-            " PostgreSQL-backed persistence and the ingestion"
-            " path for identity documents, which cut manual"
-            " onboarding time by 60 percent."
-        ),
-        "project_highlight": (
-            "In DocMinds I built the ingestion and retrieval"
-            " pipeline end to end: 19 file extensions parsed"
-            " through PyMuPDF, python-docx, python-pptx, openpyxl"
-            " and BeautifulSoup, ZIP archives opened and read"
-            " recursively, Tesseract OCR triggered when a page"
-            " has under 100 characters, and 384 dimensional"
-            " vectors stored in PostgreSQL behind an HNSW cosine"
-            " index that keeps retrieval fast as the corpus grows."
-        ),
+        "focus": "data pipelines and the databases behind them",
+        "highlights": [
+            (
+                "ZeTheta Algorithms",
+                "built the PostgreSQL data layer and identity document"
+                " ingestion path for an automated eKYC platform, cutting"
+                " manual onboarding time by 60 percent.",
+            ),
+            (
+                "DocMinds",
+                "an ingestion pipeline across 19 file formats, including"
+                " nested ZIP archives, with Tesseract OCR as the"
+                " fallback for scanned pages and 384 dimensional vectors"
+                " in PostgreSQL behind an HNSW cosine index.",
+            ),
+        ],
+        "skills": [
+            "SQL", "PostgreSQL", "PostGIS", "pgvector", "Redis",
+            "GiST and HNSW indexing", "Celery", "Python",
+        ],
+        "show_cp": True,
         "proof_url": "https://github.com/dhanoliya-ji/DocMinds",
         "proof_label": "DocMinds source",
     },
@@ -164,24 +173,31 @@ ROLE_CATEGORIES = [
             "react", "ui developer", "ux", "web developer",
             "next.js", "nextjs",
         ],
-        "skills": (
-            "React, Next.js, TypeScript, Tailwind CSS,"
-            " WebSocket streaming, and REST API integration"
-        ),
-        "experience_highlight": (
-            "At ZeTheta Algorithms I worked across the stack on"
-            " an eKYC and Video KYC platform, building the guided"
-            " capture flow that walks an applicant through"
-            " document upload and liveness checks."
-        ),
-        "project_highlight": (
-            "I built the RouteOS front end, a React dashboard"
-            " that renders live vehicle movement on a map from a"
-            " WebSocket stream, alongside a route planner and a"
-            " Redis-cached analytics view. My portfolio is a"
-            " React and Three.js single page app if you would"
-            " like to see the front end work directly."
-        ),
+        "focus": "web applications end to end, most recently in React",
+        "highlights": [
+            (
+                "ZeTheta Algorithms",
+                "built the guided capture flow that walks an applicant"
+                " through document upload and liveness checks on an"
+                " eKYC and Video KYC platform.",
+            ),
+            (
+                "RouteOS",
+                "a React dashboard that renders live vehicle movement on"
+                " a map from a WebSocket stream, with a route planner"
+                " and a Redis cached analytics view.",
+            ),
+            (
+                "Portfolio",
+                "a React and Three.js single page app, if you would like"
+                " to see the front end work directly.",
+            ),
+        ],
+        "skills": [
+            "React", "Next.js", "TypeScript", "Tailwind CSS",
+            "Three.js", "WebSockets", "REST APIs",
+        ],
+        "show_cp": False,
         "proof_url": "https://routeos-frontend.onrender.com",
         "proof_label": "RouteOS live demo",
     },
@@ -193,29 +209,33 @@ ROLE_CATEGORIES = [
             "site reliability", "systems engineer",
             "kubernetes", "docker",
         ],
-        "skills": (
-            "Docker and Docker Compose, container sandboxing,"
-            " AWS EC2 and VPC, Nginx reverse proxy with"
-            " auto-renewing TLS, GitHub Actions CI, Redis,"
-            " and Linux"
-        ),
-        "experience_highlight": (
-            "At ZeTheta Algorithms I containerized the eKYC"
-            " services and set up the deployment path for them,"
-            " which made the verification pipeline reproducible"
-            " across environments."
-        ),
-        "project_highlight": (
-            "RouteOS runs on AWS EC2 in a VPC public subnet with"
-            " cloud-init provisioning, every service orchestrated"
-            " by Docker Compose behind an auto-renewing TLS"
-            " reverse proxy, hardened down to 3 inbound ports"
-            " with the datastores on a private network. My coding"
-            " judge executes untrusted submissions in a fresh"
-            " container with no network, a read only filesystem,"
-            " a non root user, 128 MB of memory, 50 percent CPU"
-            " and a 2 second timeout."
-        ),
+        "focus": "backend services and the infrastructure they run on",
+        "highlights": [
+            (
+                "ZeTheta Algorithms",
+                "containerized the eKYC services and set up their"
+                " deployment path, making the verification pipeline"
+                " reproducible across environments.",
+            ),
+            (
+                "RouteOS",
+                "runs on AWS EC2 in a VPC with cloud-init provisioning,"
+                " Docker Compose and an auto-renewing TLS reverse proxy,"
+                " hardened to 3 inbound ports with the datastores on a"
+                " private network.",
+            ),
+            (
+                "Coding judge",
+                "executes untrusted code in a fresh container with no"
+                " network, a read only filesystem, a non root user, 128"
+                " MB of memory, half a CPU and a 2 second timeout.",
+            ),
+        ],
+        "skills": [
+            "Docker", "Docker Compose", "AWS EC2 and VPC", "Nginx",
+            "TLS", "GitHub Actions", "Redis", "Linux",
+        ],
+        "show_cp": False,
         "proof_url": (
             "https://github.com/dhanoliya-ji/"
             "RouteOS-Intelligent-Logistics-Fleet-Optimization-Platform"
@@ -235,30 +255,33 @@ ROLE_CATEGORIES = [
             # while plain "Business analyst" fell through to the generic
             # version. Titles like "SDE Intern" still match on "sde".
         ],
-        "skills": (
-            "Python, C++, FastAPI, REST API design, WebSockets,"
-            " async I/O, Celery background workers,"
-            " PostgreSQL, Redis, Docker, JWT authentication,"
-            " and multi-tenant access control"
-        ),
-        "experience_highlight": (
-            "At ZeTheta Algorithms I engineered an automated eKYC"
-            " platform with modular REST APIs, JWT authentication"
-            " with role-based access control, and"
-            " PostgreSQL-backed persistence, which cut manual"
-            " onboarding time by 60 percent."
-        ),
-        "project_highlight": (
-            "I built RouteOS, a fleet route optimizer that solves"
-            " the capacitated vehicle routing problem with time"
-            " windows in Google OR-Tools and cut total fleet"
-            " travel distance by 20 to 35 percent against a"
-            " greedy baseline on identical order sets, 375 km"
-            " against 576 km on 100 orders across 12 vehicles."
-            " I also built an online coding judge that runs"
-            " untrusted C++, Python and Java in a locked down"
-            " Docker sandbox across 37 REST endpoints."
-        ),
+        "focus": "backend systems in Python and C++",
+        "highlights": [
+            (
+                "ZeTheta Algorithms",
+                "engineered an automated eKYC platform with modular REST"
+                " APIs, JWT authentication with role based access"
+                " control and PostgreSQL persistence, cutting manual"
+                " onboarding time by 60 percent.",
+            ),
+            (
+                "RouteOS",
+                "solves the capacitated vehicle routing problem with"
+                " time windows in Google OR-Tools: 375 km against a"
+                " greedy baseline's 576 km on 100 orders across 12"
+                " vehicles.",
+            ),
+            (
+                "Coding judge",
+                "runs untrusted C++, Python and Java in a locked down"
+                " Docker sandbox, served through 37 REST endpoints.",
+            ),
+        ],
+        "skills": [
+            "Python", "C++", "FastAPI", "PostgreSQL", "Redis",
+            "Celery", "WebSockets", "Docker", "JWT",
+        ],
+        "show_cp": True,
         "proof_url": "https://routeos-frontend.onrender.com",
         "proof_label": "RouteOS live demo",
     },
@@ -266,35 +289,39 @@ ROLE_CATEGORIES = [
 
 DEFAULT_ROLE_CONFIG = {
     "name": "default",
-    "skills": (
-        "Python, C++, SQL, FastAPI, REST API design,"
-        " PostgreSQL, Redis, Docker, AWS, React and TypeScript"
-    ),
-    "experience_highlight": (
-        "At ZeTheta Algorithms I engineered an automated eKYC"
-        " and Video KYC platform, building the backend APIs and"
-        " the face verification pipeline that reached 93 percent"
-        " accuracy, and cutting manual onboarding time by 60"
-        " percent."
-    ),
-    "project_highlight": (
-        "I have since built RouteOS, a fleet route optimizer in"
-        " Google OR-Tools that cut travel distance by 20 to 35"
-        " percent against a greedy baseline, DocMinds, a RAG"
-        " platform that cites the exact page it answered from,"
-        " and an online coding judge that runs untrusted code in"
-        " a Docker sandbox."
-    ),
+    "focus": "backend and applied AI systems",
+    "highlights": [
+        (
+            "ZeTheta Algorithms",
+            "built the backend APIs and a 93 percent accurate face"
+            " verification pipeline for an eKYC and Video KYC platform,"
+            " cutting manual onboarding time by 60 percent.",
+        ),
+        (
+            "RouteOS",
+            "a fleet route optimizer in Google OR-Tools that cut travel"
+            " distance by 20 to 35 percent against a greedy baseline.",
+        ),
+        (
+            "DocMinds",
+            "a RAG platform that answers questions over your documents"
+            " and cites the exact page it used.",
+        ),
+    ],
+    "skills": [
+        "Python", "C++", "SQL", "FastAPI", "PostgreSQL", "Redis",
+        "Docker", "AWS", "React", "TypeScript",
+    ],
+    "show_cp": True,
     "proof_url": PORTFOLIO_URL,
     "proof_label": "portfolio",
 }
 
-# Competitive programming line, appended when the role is engineering-ish.
-CP_LINE = (
-    "Outside of projects I am a Codeforces Specialist and"
-    " CodeChef 4 star, with over 1000 problems solved, so data"
-    " structures and complexity analysis are day to day habits"
-    " rather than interview preparation."
+# Competitive programming bullet, added for roles that screen on algorithms.
+CP_HIGHLIGHT = (
+    "Competitive programming",
+    "Codeforces Specialist and CodeChef 4 star, with over 1000"
+    " problems solved.",
 )
 
 RESUME_PATH = "Resume_Gajendra_Dhanoliya.pdf"
@@ -333,7 +360,7 @@ ENABLE_FOLLOW_UP = False
 FOLLOW_UP_AFTER_DAYS = 7
 FOLLOW_UP_SUBJECT = "Following up on the {role} role at {company}"
 
-DAILY_SEND_LIMIT = 450
+DAILY_SEND_LIMIT = 50
 REPORT_FILE = "report.html"
 
 
@@ -446,10 +473,10 @@ def format_location_line(location):
         return ""
     loc = location.strip()
     if re.search(r'\bremote\b', loc, re.I):
-        return "I am comfortable working in a remote setup or on-site as required."
+        return "I am happy to work remotely or on-site, whichever suits the team."
     primary_city = re.split(r'[,/]', loc)[0].strip()
     if len(primary_city) > 2:
-        return f"I am actively open to working on-site in {primary_city} or relocating as needed."
+        return f"I am open to working on-site in {primary_city} and can relocate."
     return ""
 
 
@@ -471,113 +498,6 @@ def detect_role_category(role):
     return DEFAULT_ROLE_CONFIG
 
 
-def signature_block():
-    """The plain-text sign-off. Links are spelled out so they survive clients
-    that strip HTML, and so the recruiter can copy one without opening it."""
-    return (
-        f"Best regards,\n"
-        f"{SENDER_NAME}\n"
-        f"{SENDER_DEGREE}\n"
-        f"{SENDER_PHONE}\n"
-        f"{SENDER_EMAIL}\n"
-        f"Portfolio: {PORTFOLIO_URL}\n"
-        f"GitHub: {GITHUB_URL}\n"
-        f"LinkedIn: {LINKEDIN_URL}\n"
-    )
-
-
-def build_email_body(contact):
-    """
-    Compose the cold email.
-
-    Shape is deliberate. A recruiter decides in the first two lines whether to
-    keep reading, so the opening states the role, who I am and one verifiable
-    number, rather than opening with pleasantries. The middle gives evidence,
-    the close asks for one specific thing. No dashes anywhere: they are the
-    tell that makes a cold email read as generated.
-    """
-    config = detect_role_category(contact["role"])
-    loc_sentence = format_location_line(contact.get("location", ""))
-    loc_paragraph = f"{loc_sentence}\n\n" if loc_sentence else ""
-
-    # Only worth mentioning competitive programming for engineering roles.
-    cp_paragraph = ""
-    if config.get("name") in ("backend", "ai_ml", "data", "default"):
-        cp_paragraph = f"{CP_LINE}\n\n"
-
-    # Skipped when the proof link is the portfolio itself, since the closing
-    # paragraph already points there and the same URL twice reads as automated.
-    proof_line = ""
-    proof_url = config.get("proof_url")
-    if proof_url and proof_url != PORTFOLIO_URL:
-        proof_line = (
-            f"You can try it here"
-            f" ({config['proof_label']}): {proof_url}\n\n"
-        )
-
-    body = (
-        f"Hi {contact['hr_name']},\n"
-        f"\n"
-        f"I am writing about the {contact['role']} role at"
-        f" {contact['company']}. I am a 2026 IIT Delhi graduate"
-        f" who builds backend and applied AI systems, and I"
-        f" would like to be considered for it.\n"
-        f"\n"
-        f"{config['experience_highlight']}\n"
-        f"\n"
-        f"{config['project_highlight']}\n"
-        f"\n"
-        f"{proof_line}"
-        f"The tools I work in day to day: {config['skills']}.\n"
-        f"\n"
-        f"{cp_paragraph}"
-        f"{loc_paragraph}"
-        f"My resume is attached, and every project above has a"
-        f" live demo and its full source linked from my"
-        f" portfolio: {PORTFOLIO_URL}\n"
-        f"\n"
-        f"Would you be open to a short call this week, or could"
-        f" you point me to the right person on the team? Happy"
-        f" to complete a task or take a technical screen"
-        f" whenever it suits you.\n"
-        f"\n"
-        f"{signature_block()}"
-    )
-    return body
-
-
-def build_follow_up_body(contact):
-    """
-    One follow-up, a week later.
-
-    Short on purpose. It adds a reason to reply rather than repeating the first
-    email, and it gives an explicit way out so the thread closes cleanly
-    instead of sitting unanswered.
-    """
-    config = detect_role_category(contact["role"])
-
-    body = (
-        f"Hi {contact['hr_name']},\n"
-        f"\n"
-        f"Following up on my note last week about the"
-        f" {contact['role']} role at {contact['company']}.\n"
-        f"\n"
-        f"I am still very interested, and my resume is attached"
-        f" again in case the first one got buried. Since I wrote,"
-        f" the quickest way to judge whether I fit is probably"
-        f" the live demos and source on my portfolio:"
-        f" {PORTFOLIO_URL}\n"
-        f"\n"
-        f"If the position is filled or I am not the right"
-        f" profile, a one line reply telling me so is genuinely"
-        f" useful and I will stop following up. If it is still"
-        f" open, I can do a technical screen at short notice.\n"
-        f"\n"
-        f"{signature_block()}"
-    )
-    return body
-
-
 # Dashes are banned from anything a recruiter reads: em and en dashes, and the
 # double hyphen people type instead. Checked at build time so a future edit to
 # a template cannot quietly reintroduce them.
@@ -597,89 +517,287 @@ def assert_no_dashes(text, label):
     return text
 
 
-def linkify(text):
-    """Turn bare URLs in the plain body into anchors for the HTML part."""
-    return re.sub(
-        r'(https?://[^\s<>()]+)',
-        r'<a href="\1" style="color:#1a56db;'
-        r'text-decoration:underline;">\1</a>',
-        text,
+def signature_block():
+    """The plain-text sign-off. Links are spelled out so they survive clients
+    that strip HTML, and so the recruiter can copy one without opening it."""
+    return (
+        f"Best regards,\n"
+        f"{SENDER_NAME}\n"
+        f"{SENDER_DEGREE}\n"
+        f"{SENDER_PHONE}\n"
+        f"{SENDER_EMAIL}\n"
+        f"Portfolio: {PORTFOLIO_URL}\n"
+        f"GitHub: {GITHUB_URL}\n"
+        f"LinkedIn: {LINKEDIN_URL}\n"
     )
 
 
-def build_html_body(plain_body):
+# An email is a list of blocks, rendered twice: once as plain text and once as
+# HTML. Building both from the same blocks keeps the two parts saying exactly
+# the same thing, which spam filters check for, and lets the HTML part show
+# the highlights and links properly instead of guessing at them from text.
+#
+#   ("p", text)                 a paragraph; bare URLs become links in HTML
+#   ("p", text, html)           a paragraph with hand written HTML
+#   ("highlights", [(label, text), ...])
+#   ("proof", label, url)       the one link worth opening, shown as a button
+#   ("skills", [name, ...])
+
+def compose_email(contact):
     """
-    Render the HTML alternative.
+    Compose the cold email as blocks.
 
-    The plain-text signature is stripped and replaced with a styled one, so the
-    two parts say the same thing without the text version's link list showing
-    up twice in an HTML client.
+    Shape is deliberate. A recruiter decides in the first two lines whether to
+    keep reading, so the opening states who I am and which role, then three
+    bullets each lead with a name and a number they can verify. The close asks
+    for one specific thing. No dashes anywhere: they are the tell that makes a
+    cold email read as generated.
     """
-    body_text = plain_body
-    marker = "Best regards,"
-    if marker in body_text:
-        body_text = body_text[: body_text.index(marker)]
+    config = detect_role_category(contact["role"])
 
-    paragraphs = body_text.strip().split("\n\n")
-    html_paras = ""
-    for para in paragraphs:
-        para = para.strip()
-        if not para:
-            continue
-        para = (
-            para.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
+    highlights = list(config["highlights"])
+    if config.get("show_cp"):
+        highlights.append(CP_HIGHLIGHT)
+
+    blocks = [
+        ("p", f"Hi {contact['hr_name']},"),
+        ("p",
+         f"I am Gajendra, a 2026 IIT Delhi graduate in Electrical"
+         f" Engineering, writing about the {contact['role']} role at"
+         f" {contact['company']}. I build {config['focus']}, and this"
+         f" is the work most relevant to the role:"),
+        ("highlights", highlights),
+    ]
+
+    # Skipped when the proof link is the portfolio itself, since the closing
+    # paragraph already points there and the same URL twice reads as automated.
+    proof_url = config.get("proof_url")
+    if proof_url and proof_url != PORTFOLIO_URL:
+        blocks.append(("proof", config["proof_label"], proof_url))
+
+    blocks.append(("skills", config["skills"]))
+
+    loc_sentence = format_location_line(contact.get("location", ""))
+    if loc_sentence:
+        blocks.append(("p", loc_sentence))
+
+    blocks += [
+        ("p",
+         f"My resume is attached, and every project above has a live"
+         f" demo and its full source on my portfolio: {PORTFOLIO_URL}",
+         f"My resume is attached, and every project above has a live"
+         f" demo and its full source on"
+         f" {_html_link(PORTFOLIO_URL, 'my portfolio')}."),
+        ("p",
+         "Would you be open to a 15 minute call this week? If someone"
+         " else is handling this hire, I would be grateful if you could"
+         " point me to them. I am also happy to take a technical screen"
+         " or an assignment whenever it suits you."),
+    ]
+    return blocks
+
+
+def compose_follow_up(contact):
+    """
+    One follow-up, a week later.
+
+    Short on purpose. It adds a reason to reply rather than repeating the first
+    email, and it gives an explicit way out so the thread closes cleanly
+    instead of sitting unanswered.
+    """
+    config = detect_role_category(contact["role"])
+    proof_url = config.get("proof_url") or PORTFOLIO_URL
+    if proof_url == PORTFOLIO_URL:
+        proof_label = "my portfolio"
+    else:
+        proof_label = f"the {config['proof_label']}"
+
+    return [
+        ("p", f"Hi {contact['hr_name']},"),
+        ("p",
+         f"Following up on my note last week about the {contact['role']}"
+         f" role at {contact['company']}. I am still very interested,"
+         f" and my resume is attached again in case the first one got"
+         f" buried."),
+        ("p",
+         f"The quickest way to judge the fit is probably {proof_label}:"
+         f" {proof_url}",
+         f"The quickest way to judge the fit is probably"
+         f" {_html_link(proof_url, proof_label)}."),
+        ("p",
+         "If the position is filled or I am not the right profile, a one"
+         " line reply saying so genuinely helps, and I will stop following"
+         " up. If it is still open, I can do a technical screen at short"
+         " notice."),
+    ]
+
+
+def render_plain(blocks):
+    parts = []
+    for block in blocks:
+        kind = block[0]
+        if kind == "p":
+            parts.append(block[1])
+        elif kind == "highlights":
+            parts.append("\n".join(
+                f"• {label}: {text}" for label, text in block[1]
+            ))
+        elif kind == "proof":
+            parts.append(f"{block[1]}: {block[2]}")
+        elif kind == "skills":
+            parts.append("Stack I use day to day: " + ", ".join(block[1]) + ".")
+    return "\n\n".join(parts) + "\n\n" + signature_block()
+
+
+# Email HTML has to survive Gmail, Outlook and phone clients, none of which
+# load stylesheets reliably, so every style is inline and layout uses tables.
+# The look is kept close to a personal email on purpose: images, banners and
+# heavy colour push a message into the Promotions tab.
+FONT_STACK = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif"
+TEXT_COLOR = "#1f2937"
+MUTED_COLOR = "#6b7280"
+ACCENT_COLOR = "#1d4ed8"
+
+
+def _html_link(url, label, extra_style=""):
+    return (
+        f'<a href="{escape(url)}" style="color:{ACCENT_COLOR};'
+        f'text-decoration:underline;{extra_style}">{escape(label)}</a>'
+    )
+
+
+def linkify(text):
+    """Escape text and turn bare URLs in it into anchors."""
+    out = []
+    last = 0
+    for match in re.finditer(r"https?://[^\s<>()]+", text):
+        out.append(escape(text[last:match.start()]))
+        out.append(_html_link(match.group(0), match.group(0)))
+        last = match.end()
+    out.append(escape(text[last:]))
+    return "".join(out).replace("\n", "<br>")
+
+
+def _render_html_block(block):
+    kind = block[0]
+    p_style = f"margin:0 0 16px 0;line-height:1.6;color:{TEXT_COLOR};"
+
+    if kind == "p":
+        inner = block[2] if len(block) > 2 else linkify(block[1])
+        return f'<p style="{p_style}">{inner}</p>'
+
+    if kind == "highlights":
+        rows = "".join(
+            f'<tr>'
+            f'<td valign="top" style="padding:5px 10px 5px 0;'
+            f'color:{ACCENT_COLOR};font-size:14px;line-height:1.55;">'
+            f'&#9679;</td>'
+            f'<td style="padding:5px 0;font-size:14px;line-height:1.55;'
+            f'color:{TEXT_COLOR};">'
+            f'<strong style="color:#111827;">{escape(label)}</strong>'
+            f'<span style="color:{MUTED_COLOR};">&nbsp;&middot;&nbsp;</span>'
+            f'{escape(text)}</td>'
+            f'</tr>'
+            for label, text in block[1]
         )
-        para = linkify(para).replace("\n", "<br>")
-        html_paras += (
-            '<p style="margin:0 0 14px 0;'
-            'line-height:1.65;color:#1f2937;">'
-            f'{para}</p>\n'
+        return (
+            f'<table role="presentation" cellpadding="0" cellspacing="0"'
+            f' border="0" width="100%" style="margin:0 0 18px 0;'
+            f'background:#f8fafc;border-left:3px solid {ACCENT_COLOR};'
+            f'border-radius:6px;">'
+            f'<tr><td style="padding:12px 16px;">'
+            f'<table role="presentation" cellpadding="0" cellspacing="0"'
+            f' border="0">{rows}</table>'
+            f'</td></tr></table>'
         )
 
-    link = "color:#1a56db;text-decoration:none;"
-    html = f"""<!DOCTYPE html>
+    if kind == "proof":
+        label, url = block[1], block[2]
+        return (
+            f'<p style="margin:0 0 18px 0;">'
+            f'<a href="{escape(url)}" style="display:inline-block;'
+            f'padding:9px 16px;border:1px solid {ACCENT_COLOR};'
+            f'border-radius:6px;color:{ACCENT_COLOR};font-size:14px;'
+            f'font-weight:600;text-decoration:none;">'
+            f'Open the {escape(label)} &rarr;</a></p>'
+        )
+
+    if kind == "skills":
+        chips = "".join(
+            f'<span style="display:inline-block;margin:0 6px 6px 0;'
+            f'padding:3px 10px;background:#eef2ff;color:#3730a3;'
+            f'border-radius:12px;font-size:12.5px;line-height:1.5;'
+            f'white-space:nowrap;">{escape(skill)}</span>'
+            for skill in block[1]
+        )
+        return (
+            f'<p style="margin:0 0 6px 0;font-size:12px;'
+            f'color:{MUTED_COLOR};text-transform:uppercase;'
+            f'letter-spacing:0.5px;font-weight:600;">'
+            f'Stack I use day to day</p>'
+            f'<div style="margin:0 0 14px 0;">{chips}</div>'
+        )
+
+    raise ValueError(f"Unknown block type: {kind}")
+
+
+def render_html(blocks):
+    content = "\n".join(_render_html_block(b) for b in blocks)
+    muted = f"margin:2px 0;font-size:13px;color:{MUTED_COLOR};"
+    dot = f'<span style="color:#d1d5db;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>'
+    link = f"color:{ACCENT_COLOR};text-decoration:none;font-weight:600;"
+    links = dot.join(
+        f'<a href="{escape(url)}" style="{link}">{name}</a>'
+        for name, url in (
+            ("Portfolio", PORTFOLIO_URL),
+            ("GitHub", GITHUB_URL),
+            ("LinkedIn", LINKEDIN_URL),
+            ("Codeforces", CODEFORCES_URL),
+            ("LeetCode", LEETCODE_URL),
+        )
+    )
+    return f"""<!DOCTYPE html>
 <html>
-<body style="font-family:-apple-system,Segoe UI,Arial,sans-serif;
-             font-size:14px;color:#1f2937;max-width:620px;">
-{html_paras}
-<p style="margin:0 0 4px 0;line-height:1.65;color:#1f2937;">
-  Best regards,
-</p>
-<div style="margin-top:12px;padding-top:14px;
-            border-top:1px solid #e5e7eb;">
-  <p style="margin:0;font-weight:600;font-size:15px;
-            color:#111827;">
-    {SENDER_NAME}
-  </p>
-  <p style="margin:3px 0;font-size:13px;color:#6b7280;">
-    {SENDER_DEGREE}
-  </p>
-  <p style="margin:3px 0;font-size:13px;color:#6b7280;">
-    {SENDER_PHONE}
-    &nbsp;&bull;&nbsp;
-    <a href="mailto:{SENDER_EMAIL}" style="{link}">
-      {SENDER_EMAIL}
-    </a>
-  </p>
-  <p style="margin:6px 0 0 0;font-size:13px;">
-    <a href="{PORTFOLIO_URL}" style="{link}font-weight:600;">
-      Portfolio
-    </a>
-    &nbsp;&bull;&nbsp;
-    <a href="{GITHUB_URL}" style="{link}">GitHub</a>
-    &nbsp;&bull;&nbsp;
-    <a href="{LINKEDIN_URL}" style="{link}">LinkedIn</a>
-    &nbsp;&bull;&nbsp;
-    <a href="{CODEFORCES_URL}" style="{link}">Codeforces</a>
-    &nbsp;&bull;&nbsp;
-    <a href="{LEETCODE_URL}" style="{link}">LeetCode</a>
-  </p>
-</div>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0;padding:0;background:#ffffff;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr><td style="padding:4px 2px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+       style="max-width:600px;font-family:{FONT_STACK};font-size:15px;color:{TEXT_COLOR};">
+<tr><td>
+{content}
+<p style="margin:8px 0 14px 0;line-height:1.6;color:{TEXT_COLOR};">Best regards,</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="border-left:3px solid {ACCENT_COLOR};padding:2px 0 2px 14px;">
+<p style="margin:0 0 2px 0;font-size:16px;font-weight:700;color:#111827;">{escape(SENDER_NAME)}</p>
+<p style="{muted}">{escape(SENDER_DEGREE)}</p>
+<p style="{muted}">{escape(SENDER_PHONE)}{dot}<a href="mailto:{SENDER_EMAIL}" style="color:{MUTED_COLOR};text-decoration:none;">{SENDER_EMAIL}</a></p>
+<p style="margin:8px 0 0 0;font-size:13px;">{links}</p>
+</td>
+</tr>
+</table>
+</td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>"""
-    return html
+
+
+def build_email(contact):
+    """Return (plain, html) for the first email to a contact."""
+    blocks = compose_email(contact)
+    return render_plain(blocks), render_html(blocks)
+
+
+def build_follow_up(contact):
+    """Return (plain, html) for the follow-up email."""
+    blocks = compose_follow_up(contact)
+    return render_plain(blocks), render_html(blocks)
 
 
 # =====================================================================
@@ -1384,7 +1502,7 @@ def main():
         category = detect_role_category(contact["role"])
         cat_name = category.get("name", "default")
         subject = random.choice(SUBJECT_TEMPLATES).format(**contact)
-        body = build_email_body(contact)
+        body, html_body = build_email(contact)
 
         # A dash reaching a recruiter's inbox is the failure this guards. The
         # company or role text comes from the spreadsheet, so it can carry one
@@ -1399,8 +1517,6 @@ def main():
 
         if is_test_self:
             subject = f"[TEST SAMPLE] {subject}"
-
-        html_body = build_html_body(body)
 
         print(f"\n[{index}/{len(contacts_to_process)}]")
         print(f"  Name     : {contact['hr_name']}")
